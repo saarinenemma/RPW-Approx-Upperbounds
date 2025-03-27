@@ -2,9 +2,9 @@ import numpy as np
 import jpype
 import jpype.imports
 from jpype.types import *
-print(jpype.getDefaultJVMPath())
-jpype.startJVM("-Xmx128g", classpath=['./optimaltransport.jar'])
-from optimaltransport import Mapping
+#print(jpype.getDefaultJVMPath())
+#jpype.startJVM("-Xmx128g", classpath=['./optimaltransport.jar'])
+#from optimaltransport import Mapping
 
 def RPW(X=None, Y=None, dist=None, delta=0.1, k=1, p=1):
     # delta : acceptable additive error
