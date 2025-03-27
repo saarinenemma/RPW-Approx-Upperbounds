@@ -12,7 +12,7 @@ def RPW(X=None, Y=None, dist=None, delta=0.1, k=1, p=1):
     nz = len(X)
     dist = dist**p
     alphaa = 4.0*np.max(dist)/delta
-    gtSolver = Mapping(nz, list(X), list(Y), dist, delta)
+    gtSolver = GTTransportMapping(nz, list(X), list(Y), dist, delta)
     APinfo = np.array(gtSolver.getAPinfo()) # augmenting path info
 
     # Clean and process APinfo data
