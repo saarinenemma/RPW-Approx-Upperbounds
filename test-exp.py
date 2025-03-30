@@ -8,6 +8,12 @@ import matplotlib.pyplot as plt
 
 from scipy.spatial.distance import cdist, pdist
 
+
+
+
+import array as arr
+from py4j.java_gateway import JavaGateway
+from py4j.java_collections import SetConverter, MapConverter, ListConverter
 #import jpype
 #import jpype.imports
 #from jpype.types import *
@@ -17,8 +23,8 @@ from scipy.spatial.distance import cdist, pdist
 
 from utils import *
 
-import matlabengine
-eng = matlab.start_matlab()
+#import matlabengine
+#eng = matlab.start_matlab()
 #eng.cd(r'myFolder', nargout=0)
 
 # def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, sqrt_cost=False):
@@ -100,7 +106,16 @@ def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, 
     # q_idx : index to get returned values
     nz = len(X)
     alphaa = 4.0*np.max(dist)/delta
-    gtSolver = eng.GTMapping.GTTransportMapping(nz, list(X), list(Y), dist, delta)
+
+    gateway = JavaGateway() 
+    gateway.launch_gateway()
+    object_class = gateway.jvm.java.lang.String
+    MyJavaArray = gateway.new_array(object_class, len(X))
+    for i in range(len(X)):
+        MyJavaArray[i]=X[i]
+
+    msgObjectFromJavaApp = gateway.entry_point
+    gtSolver = msgObjectFromJavaApp.Mapping(nz, MyJavaArray, list(Y), dist, delta)
     APinfo = np.array(gtSolver.getAPinfo())
 
     # Clean and process APinfo data

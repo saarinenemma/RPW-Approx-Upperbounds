@@ -1,5 +1,8 @@
 package optimaltransport;
 
+import java.io.*; 
+import py4j.GatewayServer;
+
 public class Mapping {
 	private long startTime;
 
