@@ -11,13 +11,15 @@ from scipy.spatial.distance import cdist, pdist
 
 
 
-import array as arr
-from py4j.java_gateway import JavaGateway
-from py4j.java_collections import SetConverter, MapConverter, ListConverter
-#import jpype
-#import jpype.imports
-#from jpype.types import *
-#print(jpype.getDefaultJVMPath())
+#import array as arr
+#from py4j.java_gateway import JavaGateway
+#from py4j.java_collections import SetConverter, MapConverter, ListConverter
+
+
+import jpype
+import jpype.imports
+from jpype.types import *
+print(jpype.getDefaultJVMPath())
 #jpype.startJVM("-Xmx128g", classpath=['./optimaltransport.jar'])
 #from optimaltransport import Mapping
 
