@@ -8,14 +8,18 @@ import matplotlib.pyplot as plt
 
 from scipy.spatial.distance import cdist, pdist
 
-import jpype
-import jpype.imports
-from jpype.types import *
-print(jpype.getDefaultJVMPath())
-jpype.startJVM("-Xmx128g", classpath=['./optimaltransport.jar'])
-from optimaltransport import Mapping
+#import jpype
+#import jpype.imports
+#from jpype.types import *
+#print(jpype.getDefaultJVMPath())
+#jpype.startJVM("-Xmx128g", classpath=['./optimaltransport.jar'])
+#from optimaltransport import Mapping
 
 from utils import *
+
+import matlabengine
+eng = matlab.start_matlab()
+#eng.cd(r'myFolder', nargout=0)
 
 # def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, sqrt_cost=False):
 #     # delta : acceptable additive error
@@ -96,7 +100,7 @@ def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, 
     # q_idx : index to get returned values
     nz = len(X)
     alphaa = 4.0*np.max(dist)/delta
-    gtSolver = Mapping(nz, list(X), list(Y), dist, delta)
+    gtSolver = eng.GTMapping.GTTransportMapping(nz, list(X), list(Y), dist, delta)
     APinfo = np.array(gtSolver.getAPinfo())
 
     # Clean and process APinfo data
