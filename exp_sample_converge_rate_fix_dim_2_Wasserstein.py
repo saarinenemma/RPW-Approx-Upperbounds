@@ -12,9 +12,8 @@ import jpype
 import jpype.imports
 from jpype.types import *
 #print(jpype.getDefaultJVMPath())
-jpype.startJVM("C:/Program Files/Java/jdk-24/bin/server/jvm.dll" , classpath=['.\LMR\optimaltransportMOD.jar'])
+jpype.startJVM("C:/Program Files/Java/jdk-24/bin/server/jvm.dll" , classpath=['./LMR/optimaltransport.jar'])
 from optimaltransport import Mapping
-
 
 
 from utils import *
@@ -98,18 +97,14 @@ def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, 
     # q_idx : index to get returned values
     nz = len(X)
     alphaa = 4.0*np.max(dist)/delta
-    p=2
-    guess=0
-    for x in range(int(10)):
-        guess+=.1
-        gtSolver = Mapping(nz, list(X), list(Y), dist, delta,p,guess)
+    gtSolver = Mapping(nz, list(X), list(Y), dist, delta)
     APinfo = np.array(gtSolver.getAPinfo())
 
     # Clean and process APinfo data
-    clean_mask = (APinfo[:,2] >= 1)
+    clean_mask = (APinfo[:,1] >= 1)
     APinfo_cleaned = APinfo[clean_mask]
 
-    cost_AP = (APinfo_cleaned[:,4]/alphaa) * (APinfo_cleaned[:,2]/(alphaa*nz))
+    cost_AP = (APinfo_cleaned[:,3]/alphaa) * (APinfo_cleaned[:,1]/(alphaa*nz))
     cumCost =np.sqrt(np.cumsum(cost_AP))
     # cumCost = np.cumsum(cost_AP)/(alphaa*alphaa*nz)
 
@@ -120,14 +115,14 @@ def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, 
     else:
         normalized_cumcost = (cumCost)/(1.0 * totalCost)
 
-    maxdual = APinfo_cleaned[:,4]/alphaa*metric_scaler
+    maxdual = APinfo_cleaned[:,3]/alphaa*metric_scaler
     final_dual = maxdual[-1]
     if final_dual == 0:
         normalized_maxdual = maxdual * 0.0
     else:
         normalized_maxdual = maxdual/final_dual
 
-    cumFlow = np.cumsum((APinfo_cleaned[:,2]).astype(int))
+    cumFlow = np.cumsum((APinfo_cleaned[:,1]).astype(int))
     totalFlow = cumFlow[-1]
     flowProgress = (cumFlow)/(1.0 * totalFlow)
 

@@ -3,16 +3,16 @@ import jpype
 import jpype.imports
 from jpype.types import *
 #print(jpype.getDefaultJVMPath())
-jpype.startJVM("C:/Program Files/Java/jdk-24/bin/server/jvm.dll" , classpath=['./LMR/optimaltransportMOD.jar'])
-from optimaltransportMOD import Mapping
+jpype.startJVM("C:/Program Files/Java/jdk-24/bin/server/jvm.dll" , classpath=['./LMR/optimaltransport.jar'])
+from optimaltransport import Mapping
 
-def RPWMod(X=None, Y=None, dist=None, delta=0.1, k=1, p=1):
+def RPW(X=None, Y=None, dist=None, delta=0.1, k=1, p=1):
     # delta : acceptable additive error
     # q_idx : index to get returned values
     nz = len(X)
     dist = dist**p
     alphaa = 4.0*np.max(dist)/delta
-    gtSolver = Mapping(nz, list(X), list(Y), dist, delta, p)
+    gtSolver = Mapping(nz, list(X), list(Y), dist, delta)
     APinfo = np.array(gtSolver.getAPinfo()) # augmenting path info
 
     # Clean and process APinfo data
