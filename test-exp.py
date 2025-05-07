@@ -19,109 +19,41 @@ from scipy.optimize import brentq
 
 from utils import *
 
-# def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, sqrt_cost=False):
-#     # delta : acceptable additive error
-#     # q_idx : index to get returned values
-#     nz = len(X)
-#     gtSolver = Mapping(nz, list(X), list(Y), dist, delta)
-#     APinfo = np.array(gtSolver.getAPinfo())
 
-#     # Clean and process APinfo data
-#     clean_mask = (APinfo[:,2] >= 1)
-#     APinfo_cleaned = APinfo[clean_mask]
-
-#     cost_AP = APinfo_cleaned[:,4] * APinfo_cleaned[:,2]
-#     cumCost = np.cumsum(cost_AP)
-#     if sqrt_cost:
-#         cumCost = np.sqrt(cumCost)
-#     real_total_cost = gtSolver.getTotalCost()
-#     if real_total_cost == 0:
-#         cumCost = cumCost * 0.0
-#     else:
-#         cumCost = cumCost / (cumCost[-1] / real_total_cost)
-#     cumCost *= metric_scaler
-#     totalCost = cumCost[-1]
-#     cumCost = np.sqrt(cumCost)
-#     if totalCost == 0:
-#         normalized_cumcost = (cumCost) * 0.0
-#     else:
-#         normalized_cumcost = (cumCost)/(1.0 * totalCost)
-
-    
-
-#     alphaa = 4.0*np.max(dist)/delta
-#     maxdual = APinfo_cleaned[:,4]/alphaa*metric_scaler
-#     final_dual = maxdual[-1]
-#     if final_dual == 0:
-#         normalized_maxdual = maxdual * 0.0
-#     else:
-#         normalized_maxdual = maxdual/final_dual
-
-#     cumFlow = np.cumsum((APinfo_cleaned[:,2]).astype(int))
-#     totalFlow = cumFlow[-1]
-#     flowProgress = (cumFlow)/(1.0 * totalFlow)
-
-#     d_cost = (1 - flowProgress) - cumCost
-#     d_ind_a = np.nonzero(d_cost<=0)[0][0]-1
-#     d_ind_b = d_ind_a + 1
-#     alpha = find_intersection_point(flowProgress[d_ind_a], d_cost[d_ind_a], flowProgress[d_ind_b], d_cost[d_ind_b])
-#     alpha_OT = cumCost[d_ind_a] + (cumCost[d_ind_b]-cumCost[d_ind_a])*(alpha-flowProgress[d_ind_a])/(flowProgress[d_ind_b]-flowProgress[d_ind_a])
-#     alpha = 1 - alpha
-
-#     d_cost = (1 - flowProgress) - normalized_cumcost
-#     d_ind_a = np.nonzero(d_cost<=0)[0][0]-1
-#     d_ind_b = d_ind_a + 1
-#     alpha_normalized = find_intersection_point(flowProgress[d_ind_a], d_cost[d_ind_a], flowProgress[d_ind_b], d_cost[d_ind_b])
-#     alpha_normalized_OT = normalized_cumcost[d_ind_a] + (normalized_cumcost[d_ind_b]-normalized_cumcost[d_ind_a])*(alpha_normalized-flowProgress[d_ind_a])/(flowProgress[d_ind_b]-flowProgress[d_ind_a])
-#     alpha_normalized = 1 - alpha_normalized
-    
-#     d_dual = (1 - flowProgress) - maxdual
-#     d_ind_a = np.nonzero(d_dual<=0)[0][0]-1
-#     d_ind_b = d_ind_a + 1
-#     beta = find_intersection_point(flowProgress[d_ind_a], d_dual[d_ind_a], flowProgress[d_ind_b], d_dual[d_ind_b])
-#     beta_maxdual = maxdual[d_ind_a] + (maxdual[d_ind_b]-maxdual[d_ind_a])*(beta-flowProgress[d_ind_a])/(flowProgress[d_ind_b]-flowProgress[d_ind_a])
-#     beta = 1 - beta
-
-#     d_dual = (1 - flowProgress) - normalized_maxdual
-#     d_ind_a = np.nonzero(d_dual<=0)[0][0]-1
-#     d_ind_b = d_ind_a + 1
-#     beta_normalized = find_intersection_point(flowProgress[d_ind_a], d_dual[d_ind_a], flowProgress[d_ind_b], d_dual[d_ind_b])
-#     beta_normalized_maxdual = normalized_maxdual[d_ind_a] + (normalized_maxdual[d_ind_b]-normalized_maxdual[d_ind_a])*(beta_normalized-flowProgress[d_ind_a])/(flowProgress[d_ind_b]-flowProgress[d_ind_a])
-#     beta_normalized = 1 - beta_normalized
-    
-#     realtotalCost = gtSolver.getTotalCost()
-
-#     return alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost
-
+# our new approximation method
 def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, sqrt_cost=False,p=2):
     # delta : acceptable additive error
     # q_idx : index to get returned values
     nz = len(X)
+
+    #intial values for guessing procedure
     alphaa = 4.0*np.max(dist)/delta
     interval =4/delta
     #p=2
-
     currBest=10000
     currBestSolver=0
     currtime=0
     guess=0
+
+    #guess each value and remember the smallest estimate
     while guess<=1:
         guess+=interval
         gtSolver = MappingNew(nz, list(X), list(Y), dist, delta,p,guess)
         currBestSolver=gtSolver
-        APinfo = np.array(gtSolver.getAPinfo())
-
         
+        APinfo = np.array(gtSolver.getAPinfo())
         clean_mask = (APinfo[:,2] >= 1)
         APinfo_cleaned = APinfo[clean_mask]
-
         cost_AP = (APinfo_cleaned[:,4]/alphaa) * (APinfo_cleaned[:,2]/(alphaa*nz))
         cumCost =np.sqrt(np.cumsum(cost_AP))
+
+        #update if better estimate
         if(cumCost[-1]<currBest):
             currBestSolver=gtSolver
             currBest=cumCost[-1]
         currtime+=gtSolver.getTimeTaken()
 
+    #using our best estimate, retreive the approximation 
     gtSolver = currBestSolver
     APinfo = np.array(gtSolver.getAPinfo())
 
@@ -131,7 +63,6 @@ def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, 
 
     cost_AP = (APinfo_cleaned[:,4]/alphaa) * (APinfo_cleaned[:,2]/(alphaa*nz))
     cumCost =np.sqrt(np.cumsum(cost_AP))
-    # cumCost = np.cumsum(cost_AP)/(alphaa*alphaa*nz)
     cumCost *= metric_scaler
     totalCost = cumCost[-1]
     if totalCost == 0:
@@ -183,6 +114,8 @@ def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, 
 
     return alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost, currtime
 
+
+#previous approximation method (Code directly from Kaiyi)
 def OTP_metric_OLD(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, sqrt_cost=False,p=2):
     # delta : acceptable additive error
     # q_idx : index to get returned values
