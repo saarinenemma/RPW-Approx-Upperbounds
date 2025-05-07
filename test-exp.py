@@ -5,7 +5,7 @@ import numpy as np
 import time
 import ot
 import matplotlib.pyplot as plt
-
+import math
 from scipy.spatial.distance import cdist, pdist
 
 import jpype
@@ -47,10 +47,35 @@ def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, 
         cost_AP = (APinfo_cleaned[:,4]/alphaa) * (APinfo_cleaned[:,2]/(alphaa*nz))
         cumCost =np.sqrt(np.cumsum(cost_AP))
 
+        cumCost *= metric_scaler
+        totalCost = cumCost[-1]
+        if totalCost == 0:
+            normalized_cumcost = (cumCost) * 0.0
+        else:
+            normalized_cumcost = (cumCost)/(1.0 * totalCost)
+
+        maxdual = APinfo_cleaned[:,4]/alphaa*metric_scaler
+        final_dual = maxdual[-1]
+        if final_dual == 0:
+            normalized_maxdual = maxdual * 0.0
+        else:
+            normalized_maxdual = maxdual/final_dual
+
+        cumFlow = np.cumsum((APinfo_cleaned[:,2]).astype(int))
+        totalFlow = cumFlow[-1]
+        flowProgress = (cumFlow)/(1.0 * totalFlow)
+
+        d_cost = (1 - flowProgress) - cumCost
+        d_ind_a = np.nonzero(d_cost<=0)[0][0]-1
+        d_ind_b = d_ind_a + 1
+        alpha = find_intersection_point(flowProgress[d_ind_a], d_cost[d_ind_a], flowProgress[d_ind_b], d_cost[d_ind_b])
+        alpha_OT = cumCost[d_ind_a] + (cumCost[d_ind_b]-cumCost[d_ind_a])*(alpha-flowProgress[d_ind_a])/(flowProgress[d_ind_b]-flowProgress[d_ind_a])
+        alpha = 1 - alpha
+
         #update if better estimate
-        if(cumCost[-1]<currBest):
+        if(alpha<currBest):
             currBestSolver=gtSolver
-            currBest=cumCost[-1]
+            currBest=alpha
         currtime+=gtSolver.getTimeTaken()
 
     #using our best estimate, retreive the approximation 
@@ -288,7 +313,7 @@ rand_type = 'uniform'
 mu_a_d = 0.1
 mu_b_d = 0.9
 cov_value = 0.0001
-discrete = True
+discrete = False
 argparse = "converge_exp_N_{}_2points_p_{}_dist_{}_rand_{}_mu_{}_cov_{}_discrete_{}_ms_{}".format(N, delta, dist_type, rand_type, mu_a_d, cov_value, discrete, ms)
 rerun = True
 
