@@ -13,9 +13,9 @@ import jpype.imports
 from jpype.types import *
 #print(jpype.getDefaultJVMPath())
 jpype.startJVM("C:/Program Files/Java/jdk-24/bin/server/jvm.dll" , classpath=['.\LMR\optimaltransportMOD.jar'])
+from optimaltransport import MappingNew
 from optimaltransport import Mapping
-
-
+from scipy.optimize import brentq
 
 from utils import *
 
@@ -93,16 +93,102 @@ from utils import *
 
 #     return alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost
 
-def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, sqrt_cost=False):
+def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, sqrt_cost=False,p=2):
     # delta : acceptable additive error
     # q_idx : index to get returned values
     nz = len(X)
     alphaa = 4.0*np.max(dist)/delta
-    p=2
+    interval =4/delta
+    #p=2
+
+    currBest=10000
+    currBestSolver=0
+    currtime=0
     guess=0
-    for x in range(int(10)):
-        guess+=.1
-        gtSolver = Mapping(nz, list(X), list(Y), dist, delta,p,guess)
+    while guess<=1:
+        guess+=interval
+        gtSolver = MappingNew(nz, list(X), list(Y), dist, delta,p,guess)
+        currBestSolver=gtSolver
+        APinfo = np.array(gtSolver.getAPinfo())
+
+        
+        clean_mask = (APinfo[:,2] >= 1)
+        APinfo_cleaned = APinfo[clean_mask]
+
+        cost_AP = (APinfo_cleaned[:,4]/alphaa) * (APinfo_cleaned[:,2]/(alphaa*nz))
+        cumCost =np.sqrt(np.cumsum(cost_AP))
+        if(cumCost[-1]<currBest):
+            currBestSolver=gtSolver
+            currBest=cumCost[-1]
+        currtime+=gtSolver.getTimeTaken()
+
+    gtSolver = currBestSolver
+    APinfo = np.array(gtSolver.getAPinfo())
+
+     # Clean and process APinfo data
+    clean_mask = (APinfo[:,2] >= 1)
+    APinfo_cleaned = APinfo[clean_mask]
+
+    cost_AP = (APinfo_cleaned[:,4]/alphaa) * (APinfo_cleaned[:,2]/(alphaa*nz))
+    cumCost =np.sqrt(np.cumsum(cost_AP))
+    # cumCost = np.cumsum(cost_AP)/(alphaa*alphaa*nz)
+    cumCost *= metric_scaler
+    totalCost = cumCost[-1]
+    if totalCost == 0:
+        normalized_cumcost = (cumCost) * 0.0
+    else:
+        normalized_cumcost = (cumCost)/(1.0 * totalCost)
+
+    maxdual = APinfo_cleaned[:,4]/alphaa*metric_scaler
+    final_dual = maxdual[-1]
+    if final_dual == 0:
+        normalized_maxdual = maxdual * 0.0
+    else:
+        normalized_maxdual = maxdual/final_dual
+
+    cumFlow = np.cumsum((APinfo_cleaned[:,2]).astype(int))
+    totalFlow = cumFlow[-1]
+    flowProgress = (cumFlow)/(1.0 * totalFlow)
+
+    d_cost = (1 - flowProgress) - cumCost
+    d_ind_a = np.nonzero(d_cost<=0)[0][0]-1
+    d_ind_b = d_ind_a + 1
+    alpha = find_intersection_point(flowProgress[d_ind_a], d_cost[d_ind_a], flowProgress[d_ind_b], d_cost[d_ind_b])
+    alpha_OT = cumCost[d_ind_a] + (cumCost[d_ind_b]-cumCost[d_ind_a])*(alpha-flowProgress[d_ind_a])/(flowProgress[d_ind_b]-flowProgress[d_ind_a])
+    alpha = 1 - alpha
+
+    d_cost = (1 - flowProgress) - normalized_cumcost
+    d_ind_a = np.nonzero(d_cost<=0)[0][0]-1
+    d_ind_b = d_ind_a + 1
+    alpha_normalized = find_intersection_point(flowProgress[d_ind_a], d_cost[d_ind_a], flowProgress[d_ind_b], d_cost[d_ind_b])
+    alpha_normalized_OT = normalized_cumcost[d_ind_a] + (normalized_cumcost[d_ind_b]-normalized_cumcost[d_ind_a])*(alpha_normalized-flowProgress[d_ind_a])/(flowProgress[d_ind_b]-flowProgress[d_ind_a])
+    alpha_normalized = 1 - alpha_normalized
+    
+    d_dual = (1 - flowProgress) - maxdual
+    d_ind_a = np.nonzero(d_dual<=0)[0][0]-1
+    d_ind_b = d_ind_a + 1
+    beta = find_intersection_point(flowProgress[d_ind_a], d_dual[d_ind_a], flowProgress[d_ind_b], d_dual[d_ind_b])
+    beta_maxdual = maxdual[d_ind_a] + (maxdual[d_ind_b]-maxdual[d_ind_a])*(beta-flowProgress[d_ind_a])/(flowProgress[d_ind_b]-flowProgress[d_ind_a])
+    beta = 1 - beta
+
+    d_dual = (1 - flowProgress) - normalized_maxdual
+    d_ind_a = np.nonzero(d_dual<=0)[0][0]-1
+    d_ind_b = d_ind_a + 1
+    beta_normalized = find_intersection_point(flowProgress[d_ind_a], d_dual[d_ind_a], flowProgress[d_ind_b], d_dual[d_ind_b])
+    beta_normalized_maxdual = normalized_maxdual[d_ind_a] + (normalized_maxdual[d_ind_b]-normalized_maxdual[d_ind_a])*(beta_normalized-flowProgress[d_ind_a])/(flowProgress[d_ind_b]-flowProgress[d_ind_a])
+    beta_normalized = 1 - beta_normalized
+    
+    realtotalCost = np.sqrt(gtSolver.getTotalCost())
+    # realtotalCost = gtSolver.getTotalCost()
+
+    return alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost, currtime
+
+def OTP_metric_OLD(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, sqrt_cost=False,p=2):
+    # delta : acceptable additive error
+    # q_idx : index to get returned values
+    nz = len(X)
+    alphaa = 4.0*np.max(dist)/delta
+    gtSolver = Mapping(nz, list(X), list(Y), dist, delta)
     APinfo = np.array(gtSolver.getAPinfo())
 
     # Clean and process APinfo data
@@ -162,7 +248,8 @@ def OTP_metric(X=None, Y=None, dist=None, delta=0.1, metric_scaler=1, i=0, j=0, 
     realtotalCost = np.sqrt(gtSolver.getTotalCost())
     # realtotalCost = gtSolver.getTotalCost()
 
-    return alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost
+    return alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost, gtSolver.getTimeTaken()
+
 
 def cell_spliting_filter_2d(X, Y, n_cells=16, p=2):
     # this function is to assign each point in X and Y to a cell in 2d space, and then compute the cell-wise cost matrix, return the mass of each cell in X and Y, and the cell-wise cost matrix
@@ -218,6 +305,19 @@ def find_intersection_point(x1, y1, x2, y2):
     x = -b/a
     return x
 
+def find_intersection_point_p(x0, y0, x1, y1, p, k=0.1):
+    # print(x0, y0, x1, y1)
+    # Define linear f(x) and h(x) = f(x) - g(x)
+    def f_piece(x):
+        return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+
+    def h(x):
+        return f_piece(x) - (k * (1 - x)) ** p
+
+    return brentq(h, x0, x1)  # return only x
+
+
+
 def sample_from_combined_gaussians(mu_a, mu_b, cov, cur_sample_size):
     """
     Sampling from a combination of two Gaussian distributions.
@@ -246,6 +346,7 @@ N = 10
 d = [2]
 ms = [0.1, 1, 10]
 d_OTP_metric = np.zeros((len(sample_size), len(d), len(ms), N))
+d_OTP_metricOLD = np.zeros((len(sample_size), len(d), len(ms), N))
 d_emd = np.zeros((len(sample_size), len(d), N))
 d_l1 = np.zeros((len(sample_size), len(d), N))
 delta = 1e-6
@@ -311,18 +412,22 @@ if rerun:
 
                 for m in range(len(ms)):
                     metric_scaler = ms[m]
-                    alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost = OTP_metric(X=a, Y=b, dist=dist, delta=delta, metric_scaler=metric_scaler, i=i, j=j, sqrt_cost=True)
+                    alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost,timeTaken = OTP_metric(X=a, Y=b, dist=dist, delta=delta, metric_scaler=metric_scaler, i=i, j=j, sqrt_cost=True,p=2)
                     d_OTP_metric[i,j,m,k] = alpha
+                    d_OTP_time=timeTaken
+                    alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost,timeTaken = OTP_metric_OLD(X=a, Y=b, dist=dist, delta=delta, metric_scaler=metric_scaler, i=i, j=j, sqrt_cost=True,p=2)
+                    d_OTP_metricOLD[i,j,m,k] = alpha
+                    d_OTP_timeOLD=timeTaken
 
-                print('sample size: {}, dim: {}, metric scaler: {}, emd: {}, OTP: {}, k: {}'.format(cur_sample_size, d[j], metric_scaler, d_emd[i,j,k], d_OTP_metric[i,j,m,k], k))
+                print('sample size: {}, dim: {}, metric scaler: {}, emd: {}, OTP: {}, OTP Time: {}, OTPOLD: {}, OTPOLD Time: {}, k: {}'.format(cur_sample_size, d[j], metric_scaler, d_emd[i,j,k], d_OTP_metric[i,j,m,k], d_OTP_time, d_OTP_metricOLD[i,j,m,k], d_OTP_timeOLD, k))
     print('save results')
-    np.savez('./results/converge_exp_sample_converge_rate_fix_dim_2_Wasserstein_{}'.format(argparse), d_OTP_metric=d_OTP_metric, d_emd=d_emd, sample_size=sample_size, d=d, ms=ms)
+    np.savez('./results/converge_exp_sample_converge_rate_fix_dim_2_Wasserstein_{}'.format(argparse), d_OTP_metric=d_OTP_metric, d_OTP_metricOLD=d_OTP_metricOLD, d_emd=d_emd, sample_size=sample_size, d=d, ms=ms)
 
 # plot the cost curve with error band (a shaded region), x-axis: sample size (log scale), y-axis: average distance (log scale)
 fig = plt.figure()
 # make figure wide enough to show all subplots
 fig.set_figwidth(5)
-color_codes = ['g', 'b', 'c', 'm', 'y']
+color_codes = ['g', 'b', 'c', 'r','k','w','m', 'y']
 col_i = 0
 for k in range(len(d)):
     ax = fig.add_subplot(1, len(d), k+1)
@@ -346,6 +451,19 @@ for k in range(len(d)):
         # y = np.mean(d_OTP_metric_cur/d_emd_[:,k,:], axis=1)
         # ax.plot(sample_size, y, label='PRW/EMD, k = {}'.format(float(1/ms[m])))
 
+    for m in range(len(ms)):
+        d_OTP_metric_cur_OLD = d_OTP_metricOLD[:,k,m,:]
+        y = np.mean(d_OTP_metric_cur_OLD, axis=1)
+        error = np.std(d_OTP_metric_cur_OLD, axis=1)
+        ax.plot(sample_size, y, label='(2,{})-RPW-OLD'.format(float(1/ms[m])), color=color_codes[col_i])
+        ax.fill_between(sample_size, y-error, y+error, color=color_codes[col_i], alpha=0.2)
+        print('PRW, y: {}, error: {}'.format(y, error))
+        print('slope: {}'.format(np.polyfit(np.log(sample_size), np.log(y), 1)[0]))
+        col_i += 1
+        # # fill zeros with 1e-9 to avoid dividing by zero
+        # d_emd_ = np.where(d_emd==0, 1e-9, d_emd) 
+        # y = np.mean(d_OTP_metric_cur/d_emd_[:,k,:], axis=1)
+        # ax.plot(sample_size, y, label='PRW/EMD, k = {}'.format(float(1/ms[m])))
 
     d_emd_cur = d_emd[:,k,:]
     y = np.mean(d_emd_cur, axis=1)
