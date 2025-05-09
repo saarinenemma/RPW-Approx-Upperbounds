@@ -298,7 +298,7 @@ def sample_from_combined_gaussians(mu_a, mu_b, cov, cur_sample_size):
 
     return samples
 
-nn = np.linspace(1, 6, 10)
+nn = np.linspace(1, 4, 10)
 sample_size = [int(10**i) for i in nn]
 N = 10
 d = [2]
@@ -307,7 +307,7 @@ d_OTP_metric = np.zeros((len(sample_size), len(d), len(ms), N))
 d_OTP_metricOLD = np.zeros((len(sample_size), len(d), len(ms), N))
 d_emd = np.zeros((len(sample_size), len(d), N))
 d_l1 = np.zeros((len(sample_size), len(d), N))
-delta = 1e-6
+delta = .0001
 dist_type = 'sqeuclidean'
 rand_type = 'uniform'
 mu_a_d = 0.1
@@ -334,50 +334,49 @@ if rerun:
             mu_a = np.zeros(d[j])+mu_a_d
             mu_b = np.zeros(d[j])+mu_b_d
             cov = np.eye(d[j])*cov_value
-            for k in range(N):
-                cur_sample_size = sample_size[i]
-                np.random.seed(k)
-                if rand_type == 'uniform':
-                    X = np.random.rand(cur_sample_size, d[j])
-                    Y = np.random.rand(cur_sample_size, d[j])
-                # or generate data from a normal distribution, given a mean and covariance matrix in d dimensions
-                elif rand_type == 'normal': 
-                    X = np.random.multivariate_normal(mu_a, cov, cur_sample_size)
-                    Y = np.random.multivariate_normal(mu_b, cov, cur_sample_size)
-                elif rand_type == 'binormal':
-                    X = sample_from_combined_gaussians(mu_a, mu_b, cov, cur_sample_size)
-                    Y = sample_from_combined_gaussians(mu_a, mu_b, cov, cur_sample_size)
-                elif rand_type == 'two_points':
-                    a = np.ones((cur_sample_size, d[j])) * mu_a
-                    b = np.ones((cur_sample_size, d[j])) * mu_b
-                    choices_X = np.random.randint(0, 2, size=cur_sample_size)
-                    choices_Y = np.random.randint(0, 2, size=cur_sample_size)
-                    X = np.where(choices_X[:, None], a, b)
-                    Y = np.where(choices_Y[:, None], a, b)
+            cur_sample_size = sample_size[i]
+            np.random#.seed(k)
+            if rand_type == 'uniform':
+                X = np.random.rand(cur_sample_size, d[j])
+                Y = np.random.rand(cur_sample_size, d[j])
+            # or generate data from a normal distribution, given a mean and covariance matrix in d dimensions
+            elif rand_type == 'normal': 
+                X = np.random.multivariate_normal(mu_a, cov, cur_sample_size)
+                Y = np.random.multivariate_normal(mu_b, cov, cur_sample_size)
+            elif rand_type == 'binormal':
+                X = sample_from_combined_gaussians(mu_a, mu_b, cov, cur_sample_size)
+                Y = sample_from_combined_gaussians(mu_a, mu_b, cov, cur_sample_size)
+            elif rand_type == 'two_points':
+                a = np.ones((cur_sample_size, d[j])) * mu_a
+                b = np.ones((cur_sample_size, d[j])) * mu_b
+                choices_X = np.random.randint(0, 2, size=cur_sample_size)
+                choices_Y = np.random.randint(0, 2, size=cur_sample_size)
+                X = np.where(choices_X[:, None], a, b)
+                Y = np.where(choices_Y[:, None], a, b)
 
-                if discrete:
-                    a, b, dist = cell_spliting_filter_2d(X, Y, n_cells=4, p=2)
-                    # dist = dist**2
-                    d_l1[i,j,k] = np.sum(np.abs(a-b))
-                else:
-                    dist = cdist(X, Y, metric=dist_type)
-                    a = np.ones(cur_sample_size) / cur_sample_size
-                    b = np.ones(cur_sample_size) / cur_sample_size
+            if discrete:
+                a, b, dist = cell_spliting_filter_2d(X, Y, n_cells=4, p=2)
+                # dist = dist**2
+                d_l1[i,j,k] = np.sum(np.abs(a-b))
+            else:
+                dist = cdist(X, Y, metric=dist_type)
+                a = np.ones(cur_sample_size) / cur_sample_size
+                b = np.ones(cur_sample_size) / cur_sample_size
 
-                res_emd = ot.emd2(a, b, dist, processes=1, numItermax=100000000)
-                d_emd[i,j,k] = np.sqrt(res_emd)
-                # d_emd[i,j,k] = res_emd
+            res_emd = ot.emd2(a, b, dist, processes=1, numItermax=100000000)
+            d_emd[i,j,0] = np.sqrt(res_emd)
+            # d_emd[i,j,k] = res_emd
 
-                for m in range(len(ms)):
-                    metric_scaler = ms[m]
-                    alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost,timeTaken = OTP_metric(X=a, Y=b, dist=dist, delta=delta, metric_scaler=metric_scaler, i=i, j=j, sqrt_cost=True,p=2)
-                    d_OTP_metric[i,j,m,k] = alpha
-                    d_OTP_time=timeTaken
-                    alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost,timeTaken = OTP_metric_OLD(X=a, Y=b, dist=dist, delta=delta, metric_scaler=metric_scaler, i=i, j=j, sqrt_cost=True,p=2)
-                    d_OTP_metricOLD[i,j,m,k] = alpha
-                    d_OTP_timeOLD=timeTaken
+            for m in range(len(ms)):
+                metric_scaler = ms[m]
+                alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost,timeTaken = OTP_metric(X=a, Y=b, dist=dist, delta=delta, metric_scaler=metric_scaler, i=i, j=j, sqrt_cost=True,p=2)
+                d_OTP_metric[i,j,m,0] = alpha
+                d_OTP_time=timeTaken
+                alpha, alpha_OT, alpha_normalized, alpha_normalized_OT, beta, beta_maxdual, beta_normalized, beta_normalized_maxdual, realtotalCost,timeTaken = OTP_metric_OLD(X=a, Y=b, dist=dist, delta=delta, metric_scaler=metric_scaler, i=i, j=j, sqrt_cost=True,p=2)
+                d_OTP_metricOLD[i,j,m,0] = alpha
+                d_OTP_timeOLD=timeTaken
 
-                print('sample size: {}, dim: {}, metric scaler: {}, emd: {}, OTP: {}, OTP Time: {}, OTPOLD: {}, OTPOLD Time: {}, k: {}'.format(cur_sample_size, d[j], metric_scaler, d_emd[i,j,k], d_OTP_metric[i,j,m,k], d_OTP_time, d_OTP_metricOLD[i,j,m,k], d_OTP_timeOLD, k))
+            print('sample size: {}, dim: {}, metric scaler: {}, emd: {}, OTP: {}, OTP Time: {}, OTPOLD: {}, OTPOLD Time: {}'.format(cur_sample_size, d[j], metric_scaler, d_emd[i,j,0], d_OTP_metric[i,j,m,0], d_OTP_time, d_OTP_metricOLD[i,j,m,0], d_OTP_timeOLD))
     print('save results')
     np.savez('./results/converge_exp_sample_converge_rate_fix_dim_2_Wasserstein_{}'.format(argparse), d_OTP_metric=d_OTP_metric, d_OTP_metricOLD=d_OTP_metricOLD, d_emd=d_emd, sample_size=sample_size, d=d, ms=ms)
 
@@ -387,8 +386,8 @@ fig = plt.figure()
 fig.set_figwidth(5)
 color_codes = ['g', 'b', 'c', 'r','k','w','m', 'y']
 col_i = 0
-for k in range(len(d)):
-    ax = fig.add_subplot(1, len(d), k+1)
+for k in range(1):#len(d)):
+    ax = fig.add_subplot(1, 1,k+1) #len(d), k+1)
     # make subplots spearate enough not to overlap
     # ax.set_position([0.1+k*0.3, 0.2, 0.2, 0.6])
     ax.set_xscale('log')
